@@ -1,73 +1,27 @@
 'use latest';
 
-var parallel    = require('async').parallel;
-var MongoClient = require('mongodb').MongoClient;
+const MongoClient = require('mongodb').MongoClient;
 
-function save_word(word, db, cb) {
-  var doc       = {
-    word: word
-  };
+export default function (ctx, done) {
+    let { high , low , currency , email } = ctx.data;
+    const subscription = {  high , low , currency , email};
+    MongoClient.connect(ctx.data.MONGO_URL, (err, db) => {
+    save_subscription(subscription, db, (err) => {
+            if(err) return cb(err);
 
-  var increment = {
-    $inc: {
-      count: 1
-    }
-  };
+            done(null, 'Success.');
+        });
 
-  var opts      = {
-    upsert: true
-  };
-
-  db
-    .collection('words')
-    .updateOne(doc, increment, opts, function (err) {
-      if(err) return cb(err);
-
-      console.log('Successfully saved %s', word);
-
-      cb(null);
     });
 }
 
-module.exports = function (ctx, done) {
-  var words = ctx.data.title
-    .split(' ')
-    .concat(
-      ctx.data.excerpt.split(' ')
-    );
+function save_subscription(subscription, db, cb) {
+    db.collection('subscriptions')
+        .insertOne(subscription, (err) => {
+            if(err){
+                return cb(err);
+            }
 
-  /*MongoClient.connect(ctx.data.MONGO_URL, function (err, db) {
-    if(err) return done(err);
-
-    var job_list = words.map(function (word) {
-
-      return function (cb) {
-        save_word(word, db, function (err) {
-          if(err) return cb(err);
-
-          cb(null);
+            cb(null);
         });
-      };
-
-    });
-
-    parallel(job_list, function (err) {
-      if(err) return done(err);
-
-      done(null, 'Success.');
-    });
-
-  });*/
- /*MongoClient.connect(ctx.data.MONGO_URL, (err, db) => {
-    if(err) return res.end(err);
-
-    db
-      .collection('words')
-      .find()
-      .toArray( (err, words) => {
-        if(err) return res.end(err);
-
-          done(null, words);
-      });
-  });*/
-};
+}
