@@ -1,6 +1,84 @@
 'use latest';
 
-const parallel = require('async').parallel,
+module.exports = (context, cb) => {
+    notifyUserOnSlack(context, cb);
+};
+
+function notifyUserOnSlack(context, cb){
+    const request = require('request');
+    const _ = require('lodash@4.8.2');
+
+    // Slack bot token
+    let token = context.data.BOT_TOKEN;
+
+    //const name = extractName(context.data.comment).toLowerCase();
+    const name = 'ammar';
+
+    findUser(name, (err, id) => {
+        if (err) {
+          // If no such user, assume it's a channel
+          return postMsg(name, context.data, cb);
+        }
+
+        return openIM(id, (err, channelId) => {
+          if (err) { console.log(err); return cb(); }
+          else postMsg(channelId, context.data, cb);
+        });
+    });
+    /* Call the given endpoing in Slack API */
+    function callAPI(endpoint, form, cb){
+      request.post(`https://slack.com/api/${endpoint}`, {form}, (err, res, body) => {
+        if (err) return cb(err);
+
+        body = JSON.parse(body);
+        if (!body.ok) return cb(body.error);
+
+        return cb(null, body);
+      });
+    };
+
+    /* Find Slack ID of the user with given username */
+    function findUser(username, cb){
+      callAPI('users.list', {token}, (err, body) => {
+        if (err) return cb(err);
+
+        const user = _.find(body.members, {name: username});
+
+        if (!user) return cb(`User ${username} not found`);
+        cb(null, user.id);
+      });
+    }
+
+    /* Open a direct msg channel with given Slack user id */
+    function openIM(user, cb){
+      callAPI('im.open', {token, user}, (err, body) => {
+        if (err) return cb(err);
+        cb(null, body.channel.id);
+      });
+    }
+
+    /* Post message to specified Slack channel */
+    function postMsg(channel, data, cb){
+        const obj = {
+            title:  'wechat',
+            title_link: 'wechat'  
+        };
+        callAPI('chat.postMessage', {
+            token,
+            channel,
+            as_user: false,
+            username: 'Zendesk Mentions Bot',
+            icon_url: 'http://i.imgur.com/IhN4IzR.png?1',
+            text: 'You were mentioned in this ticket:',
+            attachments: JSON.stringify([obj])
+        }, (err, body) => {
+            if (err) { console.log(err); return cb(err); }
+            cb(null);
+        });
+    }
+}
+
+/*const parallel = require('async').parallel,
     http = require("http"),
     MongoClient = require('mongodb').MongoClient;
 
@@ -28,7 +106,7 @@ export default function (ctx, cb) {
             });
     });
     request.end();
-}
+}*/
 
 function emailPriceNotification(subscription, price){
     var request = require('request');
