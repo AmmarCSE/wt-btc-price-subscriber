@@ -14,66 +14,62 @@ function notifyUserOnSlack(context, cb){
     //const name = extractName(context.data.comment).toLowerCase();
     const name = 'ammar';
 
-    findUser(name, (err, id) => {
-        if (err) {
-          // If no such user, assume it's a channel
-          return postMsg(name, context.data, cb);
-        }
+    findUser(name)
+        .then(openIM)
+        .then(postMsg)
+        .then(success => cb(null, success));
 
-        return openIM(id, (err, channelId) => {
-          if (err) { console.log(err); return cb(); }
-          else postMsg(channelId, context.data, cb);
-        });
-    });
     /* Call the given endpoing in Slack API */
-    function callAPI(endpoint, form, cb){
-      request.post(`https://slack.com/api/${endpoint}`, {form}, (err, res, body) => {
-        if (err) return cb(err);
+    function callAPI(endpoint, form){
+        return new Promise((resolve, reject) => {
+            request.post(`https://slack.com/api/${endpoint}`, {form}, (err, res, body) => {
+                if (err) {
+                    return reject(err);
+                }
 
-        body = JSON.parse(body);
-        if (!body.ok) return cb(body.error);
+                body = JSON.parse(body);
+                if (!body.ok) {
+                    return reject(body.error);
+                }
 
-        return cb(null, body);
-      });
+                return resolve(body);
+            });
+        });
     };
 
     /* Find Slack ID of the user with given username */
-    function findUser(username, cb){
-      callAPI('users.list', {token}, (err, body) => {
-        if (err) return cb(err);
+    function findUser(username){
+        return new Promise((resolve, reject) => {
+            callAPI('users.list', {token})
+                .then(body => {
+                    const user = _.find(body.members, {name: username});
 
-        const user = _.find(body.members, {name: username});
-
-        if (!user) return cb(`User ${username} not found`);
-        cb(null, user.id);
-      });
+                    if (!user) {
+                        return reject(`User ${username} not found`);
+                    }
+                    return resolve(user.id);
+                })
+                .catch(err => reject(err));
+            });
     }
 
     /* Open a direct msg channel with given Slack user id */
-    function openIM(user, cb){
-      callAPI('im.open', {token, user}, (err, body) => {
-        if (err) return cb(err);
-        cb(null, body.channel.id);
-      });
+    function openIM(user){
+        return new Promise((resolve, reject) => {
+            callAPI('im.open', {token, user})
+                .then(body => resolve(body.channel.id))
+                .catch(err => reject(err));
+            });
     }
 
     /* Post message to specified Slack channel */
-    function postMsg(channel, data, cb){
-        const obj = {
-            title:  'wechat',
-            title_link: 'wechat'  
-        };
-        callAPI('chat.postMessage', {
-            token,
-            channel,
-            as_user: false,
-            username: 'Zendesk Mentions Bot',
-            icon_url: 'http://i.imgur.com/IhN4IzR.png?1',
-            text: 'You were mentioned in this ticket:',
-            attachments: JSON.stringify([obj])
-        }, (err, body) => {
-            if (err) { console.log(err); return cb(err); }
-            cb(null);
+    function postMsg(channel){
+        return new Promise((resolve, reject) => {
+            let data = context.data;
+            let text = 'You were mentioned in this ticket: wechatter';
+            callAPI('chat.postMessage', { token, channel, text})
+                .then(body => resolve('success'))
+                .catch(err => reject(err));
         });
     }
 }
