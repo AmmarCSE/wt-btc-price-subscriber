@@ -63,6 +63,7 @@ export default function (ctx, cb) {
             .catch(err => cb(err));
     }
 
+    //credit to https://auth0.com/blog/build-a-serverless-slack-bot-with-webtask/ for showing how to facilitate slack messages
     function notifyUserOnSlack(subscription){
         let slackToken = ctx.data.BOT_TOKEN;
 
